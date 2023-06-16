@@ -1438,7 +1438,8 @@ int ResourceManager::init_audio()
                     strstr(snd_card_name, "anorak") ||
                     strstr(snd_card_name, "diwali") ||
                     strstr(snd_card_name, "bengal") ||
-                    strstr(snd_card_name, "monaco")) {
+                    strstr(snd_card_name, "monaco") ||
+                    strstr(snd_card_name, "crow")) {
                     PAL_VERBOSE(LOG_TAG, "Found Codec sound card");
                     snd_card_found = true;
                     audio_hw_mixer = tmp_mixer;
@@ -4856,20 +4857,6 @@ int ResourceManager::HandleDetectionStreamAction(pal_stream_type_t type, int32_t
                         PAL_ERR(LOG_TAG, "Failed to do resume stream");
                 }
                 break;
-            case ST_CONCURRENT_PAUSE:
-                if (str != (Stream *)data) {
-                    status = str->ConcurrentPause();
-                    if (status)
-                        PAL_ERR(LOG_TAG, "Failed to pause stream");
-                }
-                break;
-            case ST_CONCURRENT_RESUME:
-                if (str != (Stream *)data) {
-                    status = str->ConcurrentResume();
-                    if (status)
-                        PAL_ERR(LOG_TAG, "Failed to do resume stream");
-                }
-                break;
             case ST_ENABLE_LPI: {
                 bool active = *(bool *)data;
                 status = str->EnableLPI(!active);
@@ -4992,16 +4979,16 @@ void ResourceManager::HandleStreamPauseResume(pal_stream_type_t st_type, bool ac
         return;
 
     if (active) {
-        ++(*local_dis_count);
-        if (*local_dis_count == 1) {
+        if (++(*local_dis_count) == 1) {
             // pause all sva/acd streams
-            HandleDetectionStreamAction(st_type, ST_CONCURRENT_PAUSE, NULL);
+            HandleDetectionStreamAction(st_type, ST_PAUSE, NULL);
         }
     } else {
-        --(*local_dis_count);
-        if (*local_dis_count == 0) {
+        if ((*local_dis_count) < 0) {
+            (*local_dis_count) = 0;
+        } else if ((*local_dis_count) > 0 && --(*local_dis_count) == 0) {
             // resume all sva/acd streams
-            HandleDetectionStreamAction(st_type, ST_CONCURRENT_RESUME, NULL);
+            HandleDetectionStreamAction(st_type, ST_RESUME, NULL);
         }
     }
 }
@@ -9698,7 +9685,9 @@ int ResourceManager::setParameter(uint32_t param_id, void *param_payload,
                     goto exit;
                 }
                 PAL_INFO(LOG_TAG,"PAL_PARAM_ID_SET_SOURCE_METADATA device setparam");
+                mResourceManagerMutex.unlock();
                 dev->setDeviceParameter(param_id, param_payload);
+                mResourceManagerMutex.lock();
             }
         }
         break;
@@ -9714,7 +9703,9 @@ int ResourceManager::setParameter(uint32_t param_id, void *param_payload,
                     goto exit;
                 }
                 PAL_INFO(LOG_TAG, "PAL_PARAM_ID_SET_SINK_METADATA device setparam");
+                mResourceManagerMutex.unlock();
                 dev->setDeviceParameter(param_id, param_payload);
+                mResourceManagerMutex.lock();
             }
         }
         break;
