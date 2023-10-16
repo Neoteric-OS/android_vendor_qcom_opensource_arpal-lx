@@ -58,7 +58,7 @@
 * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER
 * IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
 * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
-* IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.-->
+* IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. -->
 
 <resource_manager_info>
     <version>2.0</version>
@@ -70,13 +70,14 @@
         <param key="max_sessions" value="128"/>
         <param key="max_nonTunnel_sessions" value="4"/>
         <param key="logging_level" value ="3" />
-        <param key="context_manager_enable" value ="true" />
-        <param key="lpi_logging_enable" value ="false" />
+        <param key="context_manager_enable" value ="false" />
         <param key="upd_dedicated_be" value ="true" />
+        <param key="upd_duty_cycle_enable" value="false" />
+        <param key="dual_mono" value ="false" />
         <param key="signal_handler" value ="true" />
         <param key="device_mux_config" value ="false" />
-        <param key="upd_duty_cycle_enable" value="false" />
         <param key="upd_virtual_port" value ="false" />
+        <param key="spkr_xmax_tmax_logging_enable" value ="false" />
     </config_params>
     <config_volume>
         <use_volume_set_param>0</use_volume_set_param>
@@ -537,7 +538,7 @@
         </in-device>
         <in-device>
             <id>PAL_DEVICE_IN_FM_TUNER</id>
-            <back_end_name>MI2S-LPAIF-TX-PRIMARY</back_end_name>
+            <back_end_name>MI2S-LPAIF-TX-SECONDARY</back_end_name>
             <max_channels>2</max_channels>
             <channels>2</channels>
             <snd_device_name>play-fm</snd_device_name>
@@ -646,12 +647,13 @@
         </in-device>
         <in-device>
             <id>PAL_DEVICE_IN_EXT_EC_REF</id>
-            <back_end_name>MI2S-LPAIF-TX-TERTIARY</back_end_name>
+            <!-- The below back_end_name is for internal testing purpose only, needs to be modified to appropriate value if TDM/MI2S -->
+            <back_end_name>CODEC_DMA-LPAIF_WSA-TX-1</back_end_name>
             <snd_device_name>ext_ec_ref_tx</snd_device_name>
             <max_channels>2</max_channels>
             <channels>2</channels>
-            <samplerate>48000</samplerate>
             <bit_width>16</bit_width>
+            <samplerate>48000</samplerate>
         </in-device>
         <in-device>
             <id>PAL_DEVICE_IN_ECHO_REF</id>
@@ -690,13 +692,13 @@
                          CPS streaming: 1
                          ADSP control mode: 2
             -->
-            <cps_mode>2</cps_mode>
+            <cps_mode>1</cps_mode>
             <vbat_enabled>1</vbat_enabled>
             <wsa2_enable>0</wsa2_enable>
             <!--wsa registers physical addresses in decimal notation -->
-            <wsa_wr_cmd_reg_phy_addr>52757248</wsa_wr_cmd_reg_phy_addr>
-            <wsa_rd_cmd_reg_phy_addr>52757252</wsa_rd_cmd_reg_phy_addr>
-            <wsa_rd_fifo_reg_phy_addr>52757272</wsa_rd_fifo_reg_phy_addr>
+            <wsa_wr_cmd_reg_phy_addr>112279584</wsa_wr_cmd_reg_phy_addr>
+            <wsa_rd_cmd_reg_phy_addr>112279588</wsa_rd_cmd_reg_phy_addr>
+            <wsa_rd_fifo_reg_phy_addr>112279616</wsa_rd_fifo_reg_phy_addr>
             <!--wsa2 registers physical addresses in decimal notation and to be updated only if wsa2 is enabled, else should be marked as 0-->
             <wsa2_wr_cmd_reg_phy_addr>0</wsa2_wr_cmd_reg_phy_addr>
             <wsa2_rd_cmd_reg_phy_addr>0</wsa2_rd_cmd_reg_phy_addr>
@@ -727,8 +729,6 @@
             <usecase>
                 <name>PAL_STREAM_VOIP_RX</name>
                 <priority>2</priority>
-                <channels>1</channels>
-                <snd_device_name>speaker-mono-2</snd_device_name>
             </usecase>
             <!--
                  Playback/Recording streams have a default priority of 3
@@ -777,6 +777,7 @@
               <name>PAL_STREAM_ULTRASOUND</name>
               <priority>4</priority>
               <samplerate>96000</samplerate>
+              <bit_width>16</bit_width>
           </usecase>
         </out-device>
         <out-device>
@@ -849,7 +850,7 @@
            <usecase>
                <name>PAL_STREAM_VOICE_CALL</name>
                <priority>1</priority>
-               <samplerate>48000</samplerate>
+	       <samplerate>48000</samplerate>
                <bit_width>16</bit_width>
            </usecase>
            <usecase>
@@ -1475,7 +1476,6 @@
                 <sound_model_info>
                     <first_stage_module_params>
                         <param module_type="GMM" />
-                        <param lpi_supported="false"/>
                         <param load_sound_model_ids="0xC0000008, 0x0800104C" />
                         <param wakeup_config_ids="0xC0000008, 0x08001049" />
                         <param buffering_config_ids="0xC0000008, 0x08001044" />

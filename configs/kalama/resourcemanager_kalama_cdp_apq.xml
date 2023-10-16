@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="ISO-8859-1"?>
-<!-- Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
+<!-- Copyright (c) 2019-2021, The Linux Foundation. All rights reserved.
 
 * Redistribution and use in source and binary forms, with or without
 * modification, are permitted provided that the following conditions are
@@ -58,7 +58,7 @@
 * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER
 * IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
 * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
-* IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.-->
+* IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. -->
 
 <resource_manager_info>
     <version>2.0</version>
@@ -70,28 +70,15 @@
         <param key="max_sessions" value="128"/>
         <param key="max_nonTunnel_sessions" value="4"/>
         <param key="logging_level" value ="3" />
-        <param key="context_manager_enable" value ="true" />
+        <param key="context_manager_enable" value ="false" />
         <param key="lpi_logging_enable" value ="false" />
         <param key="upd_dedicated_be" value ="true" />
         <param key="signal_handler" value ="true" />
         <param key="device_mux_config" value ="false" />
         <param key="upd_duty_cycle_enable" value="false" />
         <param key="upd_virtual_port" value ="false" />
+        <param key="spkr_xmax_tmax_logging_enable" value ="false" />
     </config_params>
-    <config_volume>
-        <use_volume_set_param>0</use_volume_set_param>
-        <supported_streams>
-            <supported_stream>PAL_STREAM_ULTRA_LOW_LATENCY</supported_stream>
-            <supported_stream>PAL_STREAM_COMPRESSED</supported_stream>
-        </supported_streams>
-    </config_volume>
-    <config_lpm>
-        <use_disable_lpm>1</use_disable_lpm>
-        <lpm_supported_streams>
-            <lpm_supported_stream>PAL_STREAM_LOW_LATENCY</lpm_supported_stream>
-            <lpm_supported_stream>PAL_STREAM_ULTRA_LOW_LATENCY</lpm_supported_stream>
-        </lpm_supported_streams>
-    </config_lpm>
     <config_gapless key="gapless_supported" value="1"/>
     <bt_codecs>
         <codec codec_format="CODEC_TYPE_AAC" codec_type="enc|dec" codec_library="lib_bt_bundle.so" />
@@ -537,7 +524,7 @@
         </in-device>
         <in-device>
             <id>PAL_DEVICE_IN_FM_TUNER</id>
-            <back_end_name>MI2S-LPAIF-TX-PRIMARY</back_end_name>
+            <back_end_name>MI2S-LPAIF-TX-SECONDARY</back_end_name>
             <max_channels>2</max_channels>
             <channels>2</channels>
             <snd_device_name>play-fm</snd_device_name>
@@ -650,8 +637,8 @@
             <snd_device_name>ext_ec_ref_tx</snd_device_name>
             <max_channels>2</max_channels>
             <channels>2</channels>
-            <samplerate>48000</samplerate>
             <bit_width>16</bit_width>
+            <samplerate>48000</samplerate>
         </in-device>
         <in-device>
             <id>PAL_DEVICE_IN_ECHO_REF</id>
@@ -681,22 +668,22 @@
             <channels>2</channels>
             <samplerate>48000</samplerate>
             <snd_device_name>speaker</snd_device_name>
-            <speaker_protection_enabled>1</speaker_protection_enabled>
+            <speaker_protection_enabled>0</speaker_protection_enabled>
             <fractional_sr>0</fractional_sr>
             <!-- To enable external EC reference the flag extec_ref_enabled must be added as 1 -->
             <ext_ec_ref_enabled>0</ext_ec_ref_enabled>
             <!-- Flag to specify cps mode which is applicable
                  Values: disable CPS: 0
                          CPS streaming: 1
-                         ADSP control mode: 2
+                         ADSP control mode : 2
             -->
-            <cps_mode>2</cps_mode>
-            <vbat_enabled>1</vbat_enabled>
+            <cps_mode>1</cps_mode>
+            <vbat_enabled>0</vbat_enabled>
             <wsa2_enable>0</wsa2_enable>
             <!--wsa registers physical addresses in decimal notation -->
-            <wsa_wr_cmd_reg_phy_addr>52757248</wsa_wr_cmd_reg_phy_addr>
-            <wsa_rd_cmd_reg_phy_addr>52757252</wsa_rd_cmd_reg_phy_addr>
-            <wsa_rd_fifo_reg_phy_addr>52757272</wsa_rd_fifo_reg_phy_addr>
+            <wsa_wr_cmd_reg_phy_addr>112279584</wsa_wr_cmd_reg_phy_addr>
+            <wsa_rd_cmd_reg_phy_addr>112279588</wsa_rd_cmd_reg_phy_addr>
+            <wsa_rd_fifo_reg_phy_addr>112279616</wsa_rd_fifo_reg_phy_addr>
             <!--wsa2 registers physical addresses in decimal notation and to be updated only if wsa2 is enabled, else should be marked as 0-->
             <wsa2_wr_cmd_reg_phy_addr>0</wsa2_wr_cmd_reg_phy_addr>
             <wsa2_rd_cmd_reg_phy_addr>0</wsa2_rd_cmd_reg_phy_addr>
@@ -727,8 +714,6 @@
             <usecase>
                 <name>PAL_STREAM_VOIP_RX</name>
                 <priority>2</priority>
-                <channels>1</channels>
-                <snd_device_name>speaker-mono-2</snd_device_name>
             </usecase>
             <!--
                  Playback/Recording streams have a default priority of 3
@@ -777,6 +762,7 @@
               <name>PAL_STREAM_ULTRASOUND</name>
               <priority>4</priority>
               <samplerate>96000</samplerate>
+              <bit_width>16</bit_width>
           </usecase>
         </out-device>
         <out-device>
@@ -1023,6 +1009,7 @@
             <name>PAL_STREAM_VOIP_TX</name>
                 <policies>
                     <ec_ref>
+                        <disabled_stream>PAL_STREAM_LOW_LATENCY</disabled_stream>
                         <disabled_stream>PAL_STREAM_GENERIC</disabled_stream>
                     </ec_ref>
                 </policies>
@@ -1475,7 +1462,6 @@
                 <sound_model_info>
                     <first_stage_module_params>
                         <param module_type="GMM" />
-                        <param lpi_supported="false"/>
                         <param load_sound_model_ids="0xC0000008, 0x0800104C" />
                         <param wakeup_config_ids="0xC0000008, 0x08001049" />
                         <param buffering_config_ids="0xC0000008, 0x08001044" />

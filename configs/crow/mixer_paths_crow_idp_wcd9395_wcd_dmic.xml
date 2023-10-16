@@ -64,8 +64,6 @@
     <!-- These are the initial mixer settings -->
     <ctl name="WSA_AIF_VI Mixer WSA_SPKR_VI_1" value="0" />
     <ctl name="WSA_AIF_VI Mixer WSA_SPKR_VI_2" value="0" />
-    <ctl name="WSA_AIF_CPS Mixer WSA_SPKR_CPS_1" value="0" />
-    <ctl name="WSA_AIF_CPS Mixer WSA_SPKR_CPS_2" value="0" />
 
     <!-- Codec controls -->
     <!-- WSA controls -->
@@ -76,18 +74,13 @@
     <ctl name="WSA_AIF_VI Mixer WSA_SPKR_VI_1" value="0" />
     <ctl name="WSA_AIF_VI Mixer WSA_SPKR_VI_2" value="0" />
     <ctl name="WSA SPKRRECV" value="0" />
-    <ctl name="WSA PBR Enable" value="0" />
     <ctl name="Idle Detect" value="0" />
     <ctl name="SpkrLeft COMP Switch" value="0" />
     <ctl name="SpkrRight COMP Switch" value="0" />
     <ctl name="SpkrLeft VISENSE Switch" value="0" />
     <ctl name="SpkrRight VISENSE Switch" value="0" />
-    <ctl name="SpkrLeft CPS Switch" value="0" />
-    <ctl name="SpkrRight CPS Switch" value="0" />
     <ctl name="SpkrLeft SWR DAC_Port Switch" value="0" />
     <ctl name="SpkrRight SWR DAC_Port Switch" value="0" />
-    <ctl name="SpkrLeft PBR Switch" value="0" />
-    <ctl name="SpkrRight PBR Switch" value="0" />
     <ctl name="SpkrLeft WSA MODE" value="0" />
     <ctl name="SpkrRight WSA MODE" value="0" />
 
@@ -347,15 +340,10 @@
         <ctl name="WSA_COMP2 Switch" value="1" />
         <ctl name="SpkrLeft COMP Switch" value="1" />
         <ctl name="SpkrLeft VISENSE Switch" value="1" />
-        <ctl name="SpkrLeft CPS Switch" value="1" />
         <ctl name="SpkrLeft SWR DAC_Port Switch" value="1" />
         <ctl name="SpkrRight COMP Switch" value="1" />
         <ctl name="SpkrRight VISENSE Switch" value="1" />
-        <ctl name="SpkrRight CPS Switch" value="1" />
         <ctl name="SpkrRight SWR DAC_Port Switch" value="1" />
-        <ctl name="SpkrLeft PBR Switch" value="1" />
-        <ctl name="SpkrRight PBR Switch" value="1" />
-        <ctl name="WSA PBR Enable" value="1" />
         <ctl name="Idle Detect" value="1" />
     </path>
 
@@ -369,10 +357,7 @@
         <ctl name="WSA_COMP1 Switch" value="1" />
         <ctl name="SpkrLeft COMP Switch" value="1" />
         <ctl name="SpkrLeft VISENSE Switch" value="1" />
-        <ctl name="SpkrLeft CPS Switch" value="1" />
         <ctl name="SpkrLeft SWR DAC_Port Switch" value="1" />
-        <ctl name="SpkrLeft PBR Switch" value="1" />
-        <ctl name="WSA PBR Enable" value="1" />
         <ctl name="Idle Detect" value="1" />
     </path>
 
@@ -382,10 +367,7 @@
         <ctl name="WSA_COMP2 Switch" value="1" />
         <ctl name="SpkrRight COMP Switch" value="1" />
         <ctl name="SpkrRight VISENSE Switch" value="1" />
-        <ctl name="SpkrRight CPS Switch" value="1" />
         <ctl name="SpkrRight SWR DAC_Port Switch" value="1" />
-        <ctl name="SpkrRight PBR Switch" value="1" />
-        <ctl name="WSA PBR Enable" value="1" />
         <ctl name="Idle Detect" value="1" />
     </path>
 
@@ -539,19 +521,6 @@
         <ctl name="WSA_AIF_VI Mixer WSA_SPKR_VI_2" value="1" />
     </path>
 
-    <path name="cps-feedback">
-        <ctl name="WSA_AIF_CPS Mixer WSA_SPKR_CPS_1" value="1" />
-        <ctl name="WSA_AIF_CPS Mixer WSA_SPKR_CPS_2" value="1" />
-    </path>
-
-    <path name="cps-feedback-mono-1">
-        <ctl name="WSA_AIF_CPS Mixer WSA_SPKR_CPS_1" value="1" />
-    </path>
-
-    <path name="cps-feedback-mono-2">
-        <ctl name="WSA_AIF_CPS Mixer WSA_SPKR_CPS_2" value="1" />
-    </path>
-
     <path name="handset">
         <ctl name="WSA RX0 MUX" value="AIF1_PB" />
         <ctl name="WSA_RX0 INP0" value="RX0" />
@@ -559,7 +528,6 @@
         <ctl name="Idle Detect" value="1" />
         <ctl name="SpkrLeft COMP Switch" value="1" />
         <ctl name="SpkrLeft VISENSE Switch" value="1" />
-        <ctl name="SpkrLeft CPS Switch" value="1" />
         <ctl name="SpkrLeft SWR DAC_Port Switch" value="1" />
         <ctl name="WSA_RX0 Digital Volume" value="70" />
     </path>
@@ -586,7 +554,6 @@
         <ctl name="SpkrLeft COMP Switch" value="1" />
         <ctl name="SpkrLeft VISENSE Switch" value="1" />
         <ctl name="SpkrLeft SWR DAC_Port Switch" value="1" />
-        <ctl name="WSA PBR Enable" value="1" />
         <ctl name="WSA_RX0 Digital Volume" value="50" />
     </path>
 
@@ -867,9 +834,9 @@
         <ctl name="VA DEC1 MUX" value="SWR_MIC" />
         <ctl name="VA SMIC MUX0" value="SWR_MIC3" />
         <ctl name="VA SMIC MUX1" value="SWR_MIC0" />
-        <ctl name="DMIC0 ChMap" value="SWRM_TX1_CH2" />
+        <ctl name="DMIC1 ChMap" value="SWRM_TX1_CH4" />
         <ctl name="DMIC3 ChMap" value="SWRM_TX1_CH1" />
-        <ctl name="DMIC0_MIXER Switch" value="1" />
+        <ctl name="DMIC1_MIXER Switch" value="1" />
         <ctl name="DMIC3_MIXER Switch" value="1" />
     </path>
 
@@ -884,10 +851,10 @@
        <ctl name="VA SMIC MUX1" value="SWR_MIC8" />
        <ctl name="VA SMIC MUX0" value="SWR_MIC10" />
        <ctl name="DMIC0 ChMap" value="SWRM_TX2_CH2" />
-       <ctl name="DMIC2 ChMap" value="SWRM_TX3_CH1" />
+       <ctl name="DMIC1 ChMap" value="SWRM_TX3_CH1" />
        <ctl name="DMIC3 ChMap" value="SWRM_TX3_CH3" />
        <ctl name="DMIC0_MIXER Switch" value="1" />
-       <ctl name="DMIC2_MIXER Switch" value="1" />
+       <ctl name="DMIC1_MIXER Switch" value="1" />
        <ctl name="DMIC3_MIXER Switch" value="1" />
     </path>
 
@@ -904,14 +871,14 @@
         <ctl name="VA SMIC MUX2" value="SWR_MIC7" />
         <ctl name="VA SMIC MUX3" value="SWR_MIC9" />
         <ctl name="VA SMIC MUX0" value="SWR_MIC11" />
-        <ctl name="DMIC2 ChMap" value="SWRM_TX3_CH1" />
-        <ctl name="DMIC4 ChMap" value="SWRM_TX2_CH4" />
+        <ctl name="DMIC0 ChMap" value="SWRM_TX2_CH4" />
         <ctl name="DMIC1 ChMap" value="SWRM_TX3_CH2" />
         <ctl name="DMIC3 ChMap" value="SWRM_TX3_CH4" />
-        <ctl name="DMIC2_MIXER Switch" value="1" />
-        <ctl name="DMIC4_MIXER Switch" value="1" />
+        <ctl name="DMIC2 ChMap" value="SWRM_TX3_CH1" />
+        <ctl name="DMIC0_MIXER Switch" value="1" />
         <ctl name="DMIC1_MIXER Switch" value="1" />
         <ctl name="DMIC3_MIXER Switch" value="1" />
+        <ctl name="DMIC2_MIXER Switch" value="1" />
     </path>
 
     <path name="va-mic">
@@ -935,9 +902,9 @@
         <ctl name="VA DEC1 MUX" value="SWR_MIC" />
         <ctl name="VA SMIC MUX0" value="SWR_MIC3" />
         <ctl name="VA SMIC MUX1" value="SWR_MIC0" />
-        <ctl name="DMIC0 ChMap" value="SWRM_TX1_CH2" />
+        <ctl name="DMIC1 ChMap" value="SWRM_TX1_CH4" />
         <ctl name="DMIC3 ChMap" value="SWRM_TX1_CH1" />
-        <ctl name="DMIC0_MIXER Switch" value="1" />
+        <ctl name="DMIC1_MIXER Switch" value="1" />
         <ctl name="DMIC3_MIXER Switch" value="1" />
     </path>
 
@@ -957,10 +924,10 @@
         <ctl name="VA SMIC MUX2" value="SWR_MIC5" />
         <ctl name="DMIC2 ChMap" value="SWRM_TX2_CH1" />
         <ctl name="DMIC0 ChMap" value="SWRM_TX2_CH2" />
-        <ctl name="DMIC3 ChMap" value="SWRM_TX3_CH1" />
+        <ctl name="DMIC4 ChMap" value="SWRM_TX3_CH1" />
         <ctl name="DMIC2_MIXER Switch" value="1" />
         <ctl name="DMIC0_MIXER Switch" value="1" />
-        <ctl name="DMIC3_MIXER Switch" value="1" />
+        <ctl name="DMIC4_MIXER Switch" value="1" />
     </path>
 
     <path name="va-mic-qmic-lpi">
@@ -1033,9 +1000,9 @@
        <ctl name="TX DEC1 MUX" value="SWR_MIC" />
        <ctl name="TX SMIC MUX0" value="SWR_MIC3" />
        <ctl name="TX SMIC MUX1" value="SWR_MIC0" />
-       <ctl name="DMIC0 ChMap" value="SWRM_TX1_CH2" />
+       <ctl name="DMIC1 ChMap" value="SWRM_TX1_CH4" />
        <ctl name="DMIC3 ChMap" value="SWRM_TX1_CH1" />
-       <ctl name="DMIC0_MIXER Switch" value="1" />
+       <ctl name="DMIC1_MIXER Switch" value="1" />
        <ctl name="DMIC3_MIXER Switch" value="1" />
        <ctl name="TX_DEC0 Volume" value="102" />
        <ctl name="TX_DEC1 Volume" value="102" />
@@ -1048,9 +1015,9 @@
        <ctl name="TX DEC1 MUX" value="SWR_MIC" />
        <ctl name="TX SMIC MUX0" value="SWR_MIC3" />
        <ctl name="TX SMIC MUX1" value="SWR_MIC0" />
-       <ctl name="DMIC0 ChMap" value="SWRM_TX1_CH2" />
+       <ctl name="DMIC1 ChMap" value="SWRM_TX1_CH4" />
        <ctl name="DMIC3 ChMap" value="SWRM_TX1_CH1" />
-       <ctl name="DMIC0_MIXER Switch" value="1" />
+       <ctl name="DMIC1_MIXER Switch" value="1" />
        <ctl name="DMIC3_MIXER Switch" value="1" />
        <ctl name="TX_DEC0 Volume" value="102" />
        <ctl name="TX_DEC1 Volume" value="102" />
@@ -1131,10 +1098,10 @@
         <ctl name="TX_DEC1 MODE" value="ADC_LOW_PWR" />
         <ctl name="TX SMIC MUX0" value="SWR_MIC4" />
         <ctl name="TX SMIC MUX1" value="SWR_MIC8" />
-        <ctl name="DMIC0 ChMap" value="SWRM_TX2_CH1" />
+        <ctl name="DMIC1 ChMap" value="SWRM_TX2_CH1" />
         <ctl name="DMIC3 ChMap" value="SWRM_TX3_CH1" />
-        <ctl name="TX_DMIC0_MIXER Switch" value="1" />
-        <ctl name="TX_DMIC4_MIXER Switch" value="1" />
+        <ctl name="TX_DMIC1_MIXER Switch" value="1" />
+        <ctl name="TX_DMIC3_MIXER Switch" value="1" />
     </path>
 
     <path name="dmic-broadside">
@@ -1159,10 +1126,10 @@
        <ctl name="VA SMIC MUX1" value="SWR_MIC8" />
        <ctl name="VA SMIC MUX0" value="SWR_MIC10" />
        <ctl name="DMIC0 ChMap" value="SWRM_TX2_CH2" />
-       <ctl name="DMIC2 ChMap" value="SWRM_TX3_CH1" />
+       <ctl name="DMIC1 ChMap" value="SWRM_TX3_CH1" />
        <ctl name="DMIC3 ChMap" value="SWRM_TX3_CH3" />
        <ctl name="DMIC0_MIXER Switch" value="1" />
-       <ctl name="DMIC2_MIXER Switch" value="1" />
+       <ctl name="DMIC1_MIXER Switch" value="1" />
        <ctl name="DMIC3_MIXER Switch" value="1" />
     </path>
 
@@ -1177,10 +1144,10 @@
        <ctl name="VA SMIC MUX1" value="SWR_MIC8" />
        <ctl name="VA SMIC MUX0" value="SWR_MIC10" />
        <ctl name="DMIC0 ChMap" value="SWRM_TX2_CH2" />
-       <ctl name="DMIC2 ChMap" value="SWRM_TX3_CH1" />
+       <ctl name="DMIC1 ChMap" value="SWRM_TX3_CH1" />
        <ctl name="DMIC3 ChMap" value="SWRM_TX3_CH3" />
        <ctl name="DMIC0_MIXER Switch" value="1" />
-       <ctl name="DMIC2_MIXER Switch" value="1" />
+       <ctl name="DMIC1_MIXER Switch" value="1" />
        <ctl name="DMIC3_MIXER Switch" value="1" />
     </path>
 
@@ -1203,14 +1170,14 @@
        <ctl name="TX SMIC MUX2" value="SWR_MIC7" />
        <ctl name="TX SMIC MUX3" value="SWR_MIC9" />
        <ctl name="TX SMIC MUX0" value="SWR_MIC11" />
-       <ctl name="DMIC2 ChMap" value="SWRM_TX3_CH1" />
-       <ctl name="DMIC4 ChMap" value="SWRM_TX2_CH4" />
-       <ctl name="DMIC1 ChMap" value="SWRM_TX3_CH2" />
-       <ctl name="DMIC3 ChMap" value="SWRM_TX3_CH4" />
-       <ctl name="DMIC2_MIXER Switch" value="1" />
-       <ctl name="DMIC4_MIXER Switch" value="1" />
+       <ctl name="DMIC0 ChMap" value="SWRM_TX2_CH2" />
+       <ctl name="DMIC1 ChMap" value="SWRM_TX3_CH1" />
+       <ctl name="DMIC3 ChMap" value="SWRM_TX3_CH3" />
+       <ctl name="DMIC2 ChMap" value="SWRM_TX3_CH4" />
+       <ctl name="DMIC0_MIXER Switch" value="1" />
        <ctl name="DMIC1_MIXER Switch" value="1" />
        <ctl name="DMIC3_MIXER Switch" value="1" />
+       <ctl name="DMIC2_MIXER Switch" value="1" />
        <ctl name="TX_DEC0 Volume" value="102" />
        <ctl name="TX_DEC1 Volume" value="102" />
        <ctl name="TX_DEC2 Volume" value="102" />
@@ -1242,9 +1209,9 @@
         <ctl name="TX_AIF1_CAP Mixer DEC2" value="1" />
         <ctl name="TX DMIC MUX2" value="DMIC0" />
         <ctl name="TX_AIF1_CAP Mixer DEC3" value="1" />
-        <ctl name="TX DMIC MUX3" value="DMIC2" />
+        <ctl name="TX DMIC MUX3" value="DMIC1" />
         <ctl name="TX_AIF1_CAP Mixer DEC4" value="1" />
-        <ctl name="TX DMIC MUX4" value="DMIC2" />
+        <ctl name="TX DMIC MUX4" value="DMIC1" />
     </path>
 
     <path name="handset-dual-dmic-quad-dec-reverse">

@@ -28,7 +28,8 @@
  *
  * Changes from Qualcomm Innovation Center are provided under the following license:
  *
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted (subject to the limitations in the
@@ -59,11 +60,6 @@
  * IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
  * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * Changes from Qualcomm Innovation Center are provided under the following license:
- *
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
- * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
 #define LOG_TAG "PAL: SessionAlsaPcm"
@@ -1320,6 +1316,11 @@ set_mixer:
                 PAL_ERR(LOG_TAG, "getAssociatedDevices Failed\n");
                 goto exit;
             }
+            if (!rxAifBackEnds.size()) {
+                PAL_ERR(LOG_TAG, "rxAifBackEnds are not available");
+                status = -EINVAL;
+                goto exit;
+            }
             for (int i = 0; i < associatedDevices.size();i++) {
                 status = associatedDevices[i]->getDeviceAttributes(&dAttr);
                 if (0 != status) {
@@ -1569,6 +1570,11 @@ pcm_start:
             }
             break;
         case PAL_AUDIO_INPUT | PAL_AUDIO_OUTPUT:
+            if (!rxAifBackEnds.size()) {
+                PAL_ERR(LOG_TAG, "rxAifBackEnds are not available");
+                status = -EINVAL;
+                goto exit;
+            }
             status = s->getAssociatedDevices(associatedDevices);
             if (0 != status) {
                 PAL_ERR(LOG_TAG, "getAssociatedDevices Failed");
@@ -1745,6 +1751,11 @@ int SessionAlsaPcm::stop(Stream * s)
 
                 if (!pcmDevIds.size()) {
                     PAL_ERR(LOG_TAG, "frontendIDs are not available");
+                    status = -EINVAL;
+                    goto exit;
+                }
+                if (!rxAifBackEnds.size()) {
+                    PAL_ERR(LOG_TAG, "rxAifBackEnds are not available");
                     status = -EINVAL;
                     goto exit;
                 }
@@ -2134,6 +2145,7 @@ int SessionAlsaPcm::setupSessionDevice(Stream* streamHandle, pal_stream_type_t s
     std::vector<std::pair<int32_t, std::string>> rxAifBackEndsToConnect;
     std::vector<std::pair<int32_t, std::string>> txAifBackEndsToConnect;
     int32_t status = 0;
+    struct pal_device dAttr1;
 
     deviceList.push_back(deviceToConnect);
     rm->getBackEndNames(deviceList, rxAifBackEndsToConnect,
@@ -2538,12 +2550,17 @@ int SessionAlsaPcm::setParameters(Stream *streamHandle, int tagId, uint32_t para
                 goto exit;
             }
 
-            builder->payloadVolumeConfig(&paramData, &paramSize, miid, vdata);
+            if (vdata->no_of_volpair == 2 && sAttr.out_media_config.ch_info.channels == 2) {
+                builder->payloadMultichVolumemConfig(&paramData, &paramSize, miid, vdata);
+            } else {
+                builder->payloadVolumeConfig(&paramData, &paramSize, miid, vdata);
+            }
+
             if (paramSize) {
                 status = SessionAlsaUtils::setMixerParameter(mixer, device,
                                                paramData, paramSize);
                 PAL_INFO(LOG_TAG, "mixer set volume config status=%d\n", status);
-                delete [] paramData;
+                freeCustomPayload(&paramData, &paramSize);
                 paramSize = 0;
             }
             return 0;
@@ -2681,6 +2698,93 @@ int SessionAlsaPcm::setParameters(Stream *streamHandle, int tagId, uint32_t para
             }
             return 0;
         }
+        case PAL_PARAM_ID_ULTRASOUND_SET_GAIN:
+        {
+            std::vector <std::pair<int, int>> tkv;
+            const char *setParamTagControl = " setParamTag";
+            const char *streamPcm = "PCM";
+            struct mixer_ctl *ctl;
+            std::ostringstream tagCntrlName;
+            int sendToRx = 1;
+            struct agm_tag_config* tagConfig = NULL;
+            int tkv_size = 0;
+            pal_ultrasound_gain_t gain = PAL_ULTRASOUND_GAIN_MUTE;
+
+            if (!rm->IsCustomGainEnabledForUPD()) {
+                PAL_ERR(LOG_TAG, "Custom Gain not enabled for UPD, returning");
+                goto skip_ultrasound_gain;
+            }
+
+            /* Search for the tag in Rx path first */
+            device = pcmDevRxIds.at(0);
+            status = SessionAlsaUtils::getModuleInstanceId(mixer, device,
+                    rxAifBackEnds[0].second.data(),
+                    tagId, &miid);
+
+            /* Rx search failed, Check if we can find the tag in Tx path */
+            if ((0 != status) || (0 == miid)) {
+                PAL_DBG(LOG_TAG, "Fail to find module in Rx path status(%d), Now checking in Tx path", status);
+                device = pcmDevTxIds.at(0);
+                status = SessionAlsaUtils::getModuleInstanceId(mixer, device,
+                        txAifBackEnds[0].second.data(),
+                        tagId, &miid);
+                sendToRx = 0;
+            }
+            if (0 != status) {
+                PAL_ERR(LOG_TAG, "Failed to get tag info %x, status = %d", tagId, status);
+                goto skip_ultrasound_gain;
+            }
+
+            PAL_INFO(LOG_TAG, "Found module with TAG_ULTRASOUND_GAIN, miid = 0x%04x", miid);
+            gain = *((pal_ultrasound_gain_t *)payload);
+
+            tkv.clear();
+            tkv.push_back(std::make_pair(TAG_KEY_ULTRASOUND_GAIN, (uint32_t)gain));
+            PAL_INFO(LOG_TAG, "Setting TAG_KEY_ULTRASOUND_GAIN, Value %d\n", gain);
+
+            tagConfig = (struct agm_tag_config*)malloc(sizeof(struct agm_tag_config) +
+                    (tkv.size() * sizeof(agm_key_value)));
+
+            if (!tagConfig) {
+                status = -EINVAL;
+                goto skip_ultrasound_gain;
+            }
+
+            status = SessionAlsaUtils::getTagMetadata(TAG_ULTRASOUND_GAIN, tkv, tagConfig);
+            if (0 != status)
+                goto skip_ultrasound_gain;
+
+            if (sendToRx) {
+                tagCntrlName<<streamPcm<<pcmDevRxIds.at(0)<<setParamTagControl;
+                ctl = mixer_get_ctl_by_name(mixer, tagCntrlName.str().data());
+                if (!ctl) {
+                    PAL_ERR(LOG_TAG, "Invalid mixer control: %s\n", tagCntrlName.str().data());
+                    status = -EINVAL;
+                    goto skip_ultrasound_gain;
+                }
+                tkv_size = tkv.size()*sizeof(struct agm_key_value);
+                status = mixer_ctl_set_array(ctl, tagConfig, sizeof(struct agm_tag_config) + tkv_size);
+            } else {
+                tagCntrlName<<streamPcm<<pcmDevTxIds.at(0)<<setParamTagControl;
+                ctl = mixer_get_ctl_by_name(mixer, tagCntrlName.str().data());
+                if (!ctl) {
+                    PAL_ERR(LOG_TAG, "Invalid mixer control: %s\n", tagCntrlName.str().data());
+                    status = -EINVAL;
+                    goto skip_ultrasound_gain;
+                }
+                tkv_size = tkv.size()*sizeof(struct agm_key_value);
+                status = mixer_ctl_set_array(ctl, tagConfig, sizeof(struct agm_tag_config) + tkv_size);
+            }
+
+skip_ultrasound_gain:
+            if (tagConfig)
+                free(tagConfig);
+            if (status)
+                PAL_ERR(LOG_TAG, "Failed to set Ultrasound Gain %d", status);
+            return 0;
+        }
+
+
         default:
             status = -EINVAL;
             PAL_ERR(LOG_TAG, "Unsupported param id %u status %d", param_id, status);
