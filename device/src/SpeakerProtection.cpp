@@ -3053,6 +3053,8 @@ int SpeakerProtection::viTxSetupThreadLoop()
     param_id_sp_ex_vi_mode_cfg_t viExModeConfg;
     PayloadBuilder* builder = new PayloadBuilder();
     struct pal_device rxDevAttr;
+    struct mixer_ctl *miidCtl = nullptr;
+    struct mixer_ctl *pcmCtl = nullptr;
 
     PAL_DBG(LOG_TAG, "Enter: %s", __func__);
         rm = ResourceManager::getInstance();
@@ -3209,6 +3211,15 @@ int SpeakerProtection::viTxSetupThreadLoop()
             goto exit;
         }
 
+        // Set TFA98xx PCMID
+        pcmCtl = mixer_get_ctl_by_name(hwMixer, "SP PCMID");
+        if (pcmCtl) {
+            mixer_ctl_set_value(pcmCtl, 0, pcmDevIdTx.at(0));
+            PAL_DBG(LOG_TAG, "Set speaker pcm id %d for TFA98xx", pcmDevIdTx.at(0));
+        } else {
+            PAL_ERR(LOG_TAG, "Invalid mixer control: SP PCMID");
+        }
+
         connectCtrlName << "PCM" << pcmDevIdTx.at(0) << " connect";
         connectCtrl = mixer_get_ctl_by_name(virtMixer, connectCtrlName.str().data());
         if (!connectCtrl) {
@@ -3259,12 +3270,19 @@ int SpeakerProtection::viTxSetupThreadLoop()
         }
         modeConfg.th_quick_calib_flag = 0;
 
-        ret = SessionAlsaUtils::getModuleInstanceId(virtMixer, pcmDevIdTx.at(0),
+        // Get MIID from TFA mixer control
+        miidCtl = mixer_get_ctl_by_name(hwMixer, "SP MIID");
+        if (miidCtl) {
+            miid = mixer_ctl_get_value(miidCtl, 0);
+            PAL_DBG(LOG_TAG, "Got VI module miid %d from mixer control", miid);
+        } else {
+            ret = SessionAlsaUtils::getModuleInstanceId(virtMixer, pcmDevIdTx.at(0),
                         backEndName.c_str(), MODULE_VI, &miid);
-        if (ret != 0) {
-            PAL_ERR(LOG_TAG, "Failed to get tag info %x, status = %d", MODULE_VI,
-                                                            ret);
-            goto free_fe;
+            if (ret != 0) {
+                PAL_ERR(LOG_TAG, "Failed to get tag info %x, status = %d", MODULE_VI,
+                    ret);
+                goto free_fe;
+            }
         }
 
         viCustomPayloadSize = 0;
@@ -3519,6 +3537,8 @@ int32_t SpeakerProtection::spkrProtProcessingMode(bool flag)
     std::vector<Stream*> activeStreams;
     PayloadBuilder* builder = new PayloadBuilder();
     std::unique_lock<std::mutex> lock(calibrationMutex);
+    struct mixer_ctl *tfaCtl = nullptr;
+    struct mixer_ctl *miidCtl = nullptr;
 
     PAL_DBG(LOG_TAG, "Flag %d", flag);
     deviceMutex.lock();
@@ -3620,34 +3640,43 @@ int32_t SpeakerProtection::spkrProtProcessingMode(bool flag)
             goto exit;
         }
 
-        // Set the operation mode for SP module
-        PAL_DBG(LOG_TAG, "Operation mode for SP %d",
-                        rm->mSpkrProtModeValue.operationMode);
-        switch (rm->mSpkrProtModeValue.operationMode) {
-            case PAL_SP_MODE_FACTORY_TEST:
-                spModeConfg.operation_mode = FACTORY_TEST_MODE;
-            break;
-            case PAL_SP_MODE_V_VALIDATION:
-                spModeConfg.operation_mode = V_VALIDATION_MODE;
-            break;
-            default:
-                PAL_INFO(LOG_TAG, "Normal mode being used");
-                spModeConfg.operation_mode = NORMAL_MODE;
-        }
-
-        payloadSize = 0;
-        builder->payloadSPConfig(&payload, &payloadSize, miid,
-                PARAM_ID_SP_OP_MODE,(void *)&spModeConfg);
-        if (payloadSize) {
-            if (customPayload) {
-                free (customPayload);
-                customPayloadSize = 0;
-                customPayload = NULL;
+        // Set TFA98xx MIID
+        miidCtl = mixer_get_ctl_by_name(hwMixer, "SP MIID");
+        if (miidCtl) {
+            mixer_ctl_set_value(miidCtl, 0, miid);
+            PAL_DBG(LOG_TAG, "Set speaker miid %d for TFA98xx", miid);
+        } else {
+            PAL_ERR(LOG_TAG, "Invalid mixer control: SP MIID");
+        
+            // Set the operation mode for SP module
+            PAL_DBG(LOG_TAG, "Operation mode for SP %d",
+                            rm->mSpkrProtModeValue.operationMode);
+            switch (rm->mSpkrProtModeValue.operationMode) {
+                case PAL_SP_MODE_FACTORY_TEST:
+                    spModeConfg.operation_mode = FACTORY_TEST_MODE;
+                break;
+                case PAL_SP_MODE_V_VALIDATION:
+                    spModeConfg.operation_mode = V_VALIDATION_MODE;
+                break;
+                default:
+                    PAL_INFO(LOG_TAG, "Normal mode being used");
+                    spModeConfg.operation_mode = NORMAL_MODE;
             }
-            ret = updateCustomPayload(payload, payloadSize);
-            free(payload);
-            if (0 != ret) {
-                PAL_ERR(LOG_TAG," updateCustomPayload Failed\n");
+
+            payloadSize = 0;
+            builder->payloadSPConfig(&payload, &payloadSize, miid,
+                    PARAM_ID_SP_OP_MODE,(void *)&spModeConfg);
+            if (payloadSize) {
+                if (customPayload) {
+                    free (customPayload);
+                    customPayloadSize = 0;
+                    customPayload = NULL;
+                }
+                ret = updateCustomPayload(payload, payloadSize);
+                free(payload);
+                if (0 != ret) {
+                    PAL_ERR(LOG_TAG," updateCustomPayload Failed\n");
+                }
             }
         }
 
