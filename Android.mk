@@ -170,7 +170,7 @@ include $(BUILD_SHARED_LIBRARY)
 include $(CLEAR_VARS)
 LOCAL_USE_VNDK := true
 
-LOCAL_C_INCLUDES     := $(TOP)/vendor/qcom/opensource/pal
+LOCAL_C_INCLUDES     := $(TOP)/hardware/qcom-caf/sm8450/audio/pal
 
 LOCAL_CFLAGS += -Wno-tautological-compare
 LOCAL_CFLAGS += -Wno-macro-redefined
