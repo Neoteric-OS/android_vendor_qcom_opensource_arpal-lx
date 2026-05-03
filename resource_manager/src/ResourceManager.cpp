@@ -28,7 +28,7 @@
  *
  * Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
  *
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -73,6 +73,7 @@
 #include "Handset.h"
 #include "SndCardMonitor.h"
 #include "UltrasoundDevice.h"
+#include "fluence_ffv_common_calibration.h"
 #include "ECRefDevice.h"
 #include "HapticsDev.h"
 #include "HapticsDevProtection.h"
@@ -529,8 +530,9 @@ bool ResourceManager::isVbatEnabled = false;
 static int max_nt_sessions;
 bool ResourceManager::isRasEnabled = false;
 bool ResourceManager::is_multiple_sample_rate_combo_supported = true;
-bool ResourceManager::isMainSpeakerRight;
+int ResourceManager::monoSpeakerPosition = SPKR_RIGHT;
 int ResourceManager::spQuickCalTime;
+int ResourceManager::spCalTemp = INT_MAX;
 bool ResourceManager::isGaplessEnabled = false;
 bool ResourceManager::isDualMonoEnabled = false;
 bool ResourceManager::isUHQAEnabled = false;
@@ -589,6 +591,7 @@ std::shared_ptr<group_dev_config_t> ResourceManager::activeGroupDevConfig = null
 std::shared_ptr<group_dev_config_t> ResourceManager::currentGroupDevConfig = nullptr;
 std::map<group_dev_config_idx_t, std::shared_ptr<group_dev_config_t>> ResourceManager::groupDevConfigMap;
 std::vector<int> ResourceManager::spViChannelMapCfg = {};
+std::map<pal_stream_type_t,int16_t> ResourceManager::stream_ns_level_map;
 
 #define MAKE_STRING_FROM_ENUM(string) { {#string}, string }
 std::map<std::string, uint32_t> ResourceManager::btFmtTable = {
@@ -833,6 +836,132 @@ void ResourceManager::sendCrashSignal(int signal, pid_t pid, uid_t uid)
 #endif
     struct agm_dump_info dump_info = {signal, (uint32_t)pid, (uint32_t)uid};
     agm_dump(&dump_info);
+}
+
+void ResourceManager::addMicOcclusionInfo(Stream *s) {
+    std::vector<std::shared_ptr<Device>> palDevices;
+    struct pal_device dattr;
+    pal_device_id_t dev_id = PAL_DEVICE_NONE, id;
+    int status, i;
+
+    if (s == nullptr) {
+        PAL_ERR(LOG_TAG,"stream handle s is null");
+        return;
+    }
+
+    status = s->getPalDevices(palDevices);
+    if ((0 != status) || palDevices.empty()) {
+        PAL_ERR(LOG_TAG, "palDevices Failed or Empty");
+        return;
+    }
+
+    for (i = 0; i < palDevices.size(); i++) {
+        id = (pal_device_id_t)palDevices[i]->getSndDeviceId();
+        if (isInputDevId(id)) {
+            palDevices[i]->getDeviceAttributes(&dattr);
+            dev_id = id;
+            PAL_DBG(LOG_TAG," device = %d for mic map", dev_id);
+            break;
+        }
+    }
+
+    if (dev_id == PAL_DEVICE_NONE) {
+       PAL_ERR(LOG_TAG,"no input device found, can't add new entry in map");
+       return;
+    }
+
+    if (micOcclusionInfoMap.find(s) == micOcclusionInfoMap.end()) {
+        pal_param_mic_occlusion_info_t mic_info = {dev_id, false, 0, 0};
+        std::vector<pal_param_mic_occlusion_info_t> micInfoVector;
+
+        /*push mic info to vector for each mic (channel) */
+        for (i = 0; i < dattr.config.ch_info.channels; i++) {
+            micInfoVector.push_back(mic_info);
+        }
+
+        micOcclusionInfoMap[s]= micInfoVector;
+    }
+}
+
+void ResourceManager::removeMicOcclusionInfo(Stream *s)
+{
+    if (s == nullptr) {
+        PAL_ERR(LOG_TAG,"stream handle s is null");
+        return;
+    }
+
+    auto it = micOcclusionInfoMap.find(s);
+    if (it != micOcclusionInfoMap.end()) {
+        micOcclusionInfoMap.erase(it);
+    }
+}
+
+int32_t ResourceManager::updateMicOcclusionInfo(Stream *s, void *data)
+{
+    event_id_mic_occlusion_status_info_t *mic_info = nullptr;
+    uint16_t occlusionState, occludedMic;
+
+    PAL_DBG(LOG_TAG, "Enter %s", __func__);
+
+    if (!s || !data) {
+        PAL_ERR(LOG_TAG, "Invalid input: stream (%p) or data (%p) is null", s, data);
+        return -EINVAL;
+    }
+
+    mic_info = (struct event_id_mic_occlusion_status_info_t *)data;
+    occlusionState = mic_info->occlusion_state;
+
+    auto it = micOcclusionInfoMap.find(s);
+
+    if (it == micOcclusionInfoMap.end()) {
+        /*if didn't find entry, add new and update*/
+        addMicOcclusionInfo(s);
+
+        /* Re-lookup if add was successful */
+        it = micOcclusionInfoMap.find(s);
+        if (it == micOcclusionInfoMap.end()) {
+             PAL_ERR(LOG_TAG, "Failed to add mic occlusion info for stream %p", s);
+             return -ENOMEM;
+        }
+    }
+
+    PAL_DBG(LOG_TAG," mic occ state: %d", occlusionState);
+
+    switch (occlusionState) {
+        case MIC_OCC_STATE_NO_OCCLUSION:
+            /* update all the occluded mics as recovered */
+            for (int i = 0; i < micOcclusionInfoMap[s].size(); i++) {
+                if (micOcclusionInfoMap[s][i].is_occluded) {
+                    micOcclusionInfoMap[s][i].is_occluded = false;
+                    micOcclusionInfoMap[s][i].num_of_recovery++;
+                }
+            }
+        break;
+        case MIC_OCC_STATE_MIC0_BLOCKED:
+        case MIC_OCC_STATE_MIC1_BLOCKED:
+            if (occlusionState == MIC_OCC_STATE_MIC0_BLOCKED)
+                occludedMic = PRIMARY_MIC;
+            else if (occlusionState == MIC_OCC_STATE_MIC1_BLOCKED)
+                occludedMic = SECONDARY_MIC;
+
+            /* one of them mics is occluded and other(s) are recovered,
+               update occlusion status for the mics accordingly*/
+            for (int i = 0; i < micOcclusionInfoMap[s].size(); i++) {
+                if (i == occludedMic) {
+                    micOcclusionInfoMap[s][i].is_occluded = true;
+                    micOcclusionInfoMap[s][i].num_of_occlusion++;
+                } else if (micOcclusionInfoMap[s][i].is_occluded) {
+                    micOcclusionInfoMap[s][i].is_occluded = false;
+                    micOcclusionInfoMap[s][i].num_of_recovery++;
+                }
+            }
+        break;
+        default:
+            PAL_DBG(LOG_TAG," Incorrect mic occ state: %d", occlusionState);
+    }
+
+    PAL_DBG(LOG_TAG, "Exit %s", __func__);
+    return 0;
 }
 
 ResourceManager::ResourceManager()
@@ -2495,9 +2624,11 @@ bool ResourceManager::getEcRefStatus(pal_stream_type_t tx_streamtype,pal_stream_
     return ecref_status;
 }
 
-void ResourceManager::getDeviceInfo(pal_device_id_t deviceId, pal_stream_type_t type, std::string key, struct pal_device_info *devinfo)
+void ResourceManager::getDeviceInfo(pal_device_id_t deviceId, pal_stream_type_t type, std::string customKey, struct pal_device_info *devinfo)
 {
     bool found = false;
+    std::istringstream keys(customKey);
+    std::string key;
 
     for (int32_t i = 0; i < deviceInfo.size(); i++) {
         if (deviceId == deviceInfo[i].deviceId) {
@@ -2563,57 +2694,59 @@ void ResourceManager::getDeviceInfo(pal_device_id_t deviceId, pal_stream_type_t 
                                 type,
                                 deviceNameLUT.at(deviceId).c_str());
                     }
-                    /*parse custom config if there*/
-                    for (int32_t k = 0; k < deviceInfo[i].usecase[j].config.size(); k++) {
-                        if (!deviceInfo[i].usecase[j].config[k].key.compare(key)) {
-                            /*overwrite the channels if needed*/
-                            if (deviceInfo[i].usecase[j].config[k].channel) {
-                                devinfo->channels = deviceInfo[i].usecase[j].config[k].channel;
-                                devinfo->channels_overwrite = true;
-                                PAL_VERBOSE(LOG_TAG, "got overwritten channels %d for custom key %s usecase %d for dev %s",
-                                        devinfo->channels,
-                                        key.c_str(),
-                                        type,
-                                        deviceNameLUT.at(deviceId).c_str());
+                    while (std::getline(keys, key, ';')) {
+                        /*parse custom config if there*/
+                        for (int32_t k = 0; k < deviceInfo[i].usecase[j].config.size(); k++) {
+                            if (!deviceInfo[i].usecase[j].config[k].key.compare(key)) {
+                                /*overwrite the channels if needed*/
+                                if (deviceInfo[i].usecase[j].config[k].channel) {
+                                    devinfo->channels = deviceInfo[i].usecase[j].config[k].channel;
+                                    devinfo->channels_overwrite = true;
+                                    PAL_VERBOSE(LOG_TAG, "got overwritten channels %d for custom key %s usecase %d for dev %s",
+                                            devinfo->channels,
+                                            key.c_str(),
+                                            type,
+                                            deviceNameLUT.at(deviceId).c_str());
+                                }
+                                if (deviceInfo[i].usecase[j].config[k].samplerate) {
+                                    devinfo->samplerate = deviceInfo[i].usecase[j].config[k].samplerate;
+                                    devinfo->samplerate_overwrite = true;
+                                    PAL_VERBOSE(LOG_TAG, "got overwritten samplerate %d for custom key %s usecase %d for dev %s",
+                                            devinfo->samplerate,
+                                            key.c_str(),
+                                            type,
+                                            deviceNameLUT.at(deviceId).c_str());
+                                }
+                                if (!(deviceInfo[i].usecase[j].config[k].sndDevName).empty()) {
+                                    devinfo->sndDevName = deviceInfo[i].usecase[j].config[k].sndDevName;
+                                    devinfo->sndDevName_overwrite = true;
+                                    PAL_VERBOSE(LOG_TAG, "got overwitten snd dev %s for custom key %s usecase %d for dev %s",
+                                            devinfo->sndDevName.c_str(),
+                                            key.c_str(),
+                                            type,
+                                            deviceNameLUT.at(deviceId).c_str());
+                                }
+                                if (deviceInfo[i].usecase[j].config[k].priority &&
+                                    deviceInfo[i].usecase[j].config[k].priority != MIN_USECASE_PRIORITY) {
+                                    devinfo->priority = deviceInfo[i].usecase[j].config[k].priority;
+                                    PAL_VERBOSE(LOG_TAG, "got priority %d for custom key %s usecase %d for dev %s",
+                                            devinfo->priority,
+                                            key.c_str(),
+                                            type,
+                                            deviceNameLUT.at(deviceId).c_str());
+                                }
+                                if (deviceInfo[i].usecase[j].config[k].bit_width) {
+                                    devinfo->bit_width = deviceInfo[i].usecase[j].config[k].bit_width;
+                                    devinfo->bit_width_overwrite = true;
+                                    PAL_VERBOSE(LOG_TAG, "got overwritten bit width %d for custom key %s usecase %d for dev %s",
+                                            devinfo->bit_width,
+                                            key.c_str(),
+                                            type,
+                                            deviceNameLUT.at(deviceId).c_str());
+                                }
+                                found = true;
+                                break;
                             }
-                            if (deviceInfo[i].usecase[j].config[k].samplerate) {
-                                devinfo->samplerate = deviceInfo[i].usecase[j].config[k].samplerate;
-                                devinfo->samplerate_overwrite = true;
-                                PAL_VERBOSE(LOG_TAG, "got overwritten samplerate %d for custom key %s usecase %d for dev %s",
-                                        devinfo->samplerate,
-                                        key.c_str(),
-                                        type,
-                                        deviceNameLUT.at(deviceId).c_str());
-                            }
-                            if (!(deviceInfo[i].usecase[j].config[k].sndDevName).empty()) {
-                                devinfo->sndDevName = deviceInfo[i].usecase[j].config[k].sndDevName;
-                                devinfo->sndDevName_overwrite = true;
-                                PAL_VERBOSE(LOG_TAG, "got overwitten snd dev %s for custom key %s usecase %d for dev %s",
-                                        devinfo->sndDevName.c_str(),
-                                        key.c_str(),
-                                        type,
-                                        deviceNameLUT.at(deviceId).c_str());
-                            }
-                            if (deviceInfo[i].usecase[j].config[k].priority &&
-                                deviceInfo[i].usecase[j].config[k].priority != MIN_USECASE_PRIORITY) {
-                                devinfo->priority = deviceInfo[i].usecase[j].config[k].priority;
-                                PAL_VERBOSE(LOG_TAG, "got priority %d for custom key %s usecase %d for dev %s",
-                                        devinfo->priority,
-                                        key.c_str(),
-                                        type,
-                                        deviceNameLUT.at(deviceId).c_str());
-                            }
-                            if (deviceInfo[i].usecase[j].config[k].bit_width) {
-                                devinfo->bit_width = deviceInfo[i].usecase[j].config[k].bit_width;
-                                devinfo->bit_width_overwrite = true;
-                                PAL_VERBOSE(LOG_TAG, "got overwritten bit width %d for custom key %s usecase %d for dev %s",
-                                        devinfo->bit_width,
-                                        key.c_str(),
-                                        type,
-                                        deviceNameLUT.at(deviceId).c_str());
-                            }
-                            found = true;
-                            break;
                         }
                     }
                 }
@@ -5254,6 +5387,35 @@ void ResourceManager::mixerEventWaitThreadLoop(
     mixer_subscribe_events(mixer, 0);
 }
 
+int ResourceManager::getPcmIdByDevInfoName(char *mixer_str) {
+    int pcm_id = 0;
+    std::string event_str(mixer_str);
+
+    if (!mixer_str) {
+        PAL_ERR(LOG_TAG,"empty mixer str");
+        return -EINVAL;
+    }
+
+    int idx = event_str.find(" ");
+    if (idx == std::string::npos) {
+        PAL_ERR(LOG_TAG,"space index not found");
+        return -EINVAL;
+    }
+
+    std::string event_name = event_str.substr(0,idx);
+
+    for (int i = 0; i < devInfo.size();i++) {
+        if (strcmp(event_name.c_str(), devInfo[i].name) == 0) {
+            pcm_id = devInfo[i].deviceId;
+            return pcm_id;
+        }
+    }
+
+    //not found.
+    PAL_ERR(LOG_TAG,"pcm id not found");
+    return -EINVAL;
+}
+
 int ResourceManager::handleMixerEvent(struct mixer *mixer, char *mixer_str) {
     int status = 0;
     int pcm_id = 0;
@@ -5263,6 +5425,7 @@ int ResourceManager::handleMixerEvent(struct mixer *mixer, char *mixer_str) {
     // TODO: hard code in common defs
     std::string pcm_prefix = "PCM";
     std::string compress_prefix = "COMPRESS";
+    std::string voice_prefix = "VOICEMMODE";
     std::string event_suffix = "event";
     size_t prefix_idx = 0;
     size_t suffix_idx = 0;
@@ -5312,9 +5475,20 @@ int ResourceManager::handleMixerEvent(struct mixer *mixer, char *mixer_str) {
     if (prefix_idx == event_str.npos) {
         prefix_idx = event_str.find(compress_prefix);
         if (prefix_idx == event_str.npos) {
-            PAL_ERR(LOG_TAG, "Invalid mixer event");
-            status = -EINVAL;
-            goto exit;
+            prefix_idx = event_str.find(voice_prefix);
+            if (prefix_idx == event_str.npos) {
+                PAL_ERR(LOG_TAG, "Invalid mixer event");
+                status = -EINVAL;
+                goto exit;
+            } else { /*find pcm_id for voice call case*/
+                pcm_id = getPcmIdByDevInfoName(mixer_str);
+                if (pcm_id < 0) {
+                    PAL_ERR(LOG_TAG, "Invalid mixer event");
+                    status = -EINVAL;
+                    goto exit;
+                }
+                goto acquire_cb;
+            }
         } else {
             prefix_idx += compress_prefix.length();
         }
@@ -5332,6 +5506,7 @@ int ResourceManager::handleMixerEvent(struct mixer *mixer, char *mixer_str) {
     length = suffix_idx - prefix_idx;
     pcm_id = std::stoi(event_str.substr(prefix_idx, length));
 
+acquire_cb:
     // acquire callback/cookie with pcm dev id
     it = mixerEventCallbackMap.find(pcm_id);
     if (it != mixerEventCallbackMap.end()) {
@@ -10630,6 +10805,19 @@ int ResourceManager::getParameter(uint32_t param_id, void **param_payload,
             memcpy((char*)param_payload, isProxyRecordActive ? "true" : "false", *payload_size);
         }
         break;
+        case PAL_PARAM_ID_MIC_OCCLUSION_INFO:
+        {
+            PAL_INFO(LOG_TAG, "get parameter for Mic Occlusion Info");
+            auto micInfoVec = new std::vector<std::vector<pal_param_mic_occlusion_info_t>>;
+            for (const auto& it : micOcclusionInfoMap )
+            {
+                micInfoVec->push_back(it.second);
+            }
+
+        *payload_size = sizeof(micInfoVec);
+        *param_payload = static_cast<void*>(micInfoVec);
+        }
+        break;
         default:
             status = -EINVAL;
             PAL_ERR(LOG_TAG, "Unknown ParamID:%d", param_id);
@@ -11795,9 +11983,25 @@ int ResourceManager::setParameter(uint32_t param_id, void *param_payload,
             }
         }
         break;
+        case PAL_PARAM_ID_NSLEVEL_CONTROL:
+        {
+            pal_param_ns_level_control_t* param_ns_level =
+                (pal_param_ns_level_control_t *) param_payload;
+            if (payload_size == sizeof(pal_param_ns_level_control_t)) {
+                ResourceManager::stream_ns_level_map[param_ns_level->stream_type] =
+                                                                param_ns_level->ns_level;
+                handleNSLevelControl(*param_ns_level);
+            } else {
+                PAL_ERR(LOG_TAG, "Incorrect Size : Expected size %zu, Received size %zu",
+                    sizeof(pal_param_ns_level_control_t), sizeof(param_ns_level));
+                status = -EINVAL;
+                goto exit;
+            }
+        }
+        break;
         default:
             PAL_ERR(LOG_TAG, "Unknown ParamID:%d", param_id);
-            break;
+        break;
     }
 
 exit:
@@ -12010,6 +12214,29 @@ int ResourceManager::handleDeviceRotationChange (pal_param_device_rotation_t
     }
 error :
     PAL_INFO(LOG_TAG, "Exiting handleDeviceRotationChange, status %d", status);
+    return status;
+}
+
+int ResourceManager::handleNSLevelControl(pal_param_ns_level_control_t param_ns_level_control) {
+    std::list<Stream*>::iterator sIter;
+    int ret,status;
+    pal_stream_type_t type;
+
+    PAL_INFO(LOG_TAG, "handleNSLevelControl");
+
+    for (sIter =  rm->mActiveStreams.begin(); sIter !=  rm->mActiveStreams.end(); sIter++) {
+        ret = (*sIter)->getStreamType(&type);
+        if (stream_ns_level_map.find(type) != stream_ns_level_map.end()) {
+            status = (*sIter)->setParameters(PAL_PARAM_ID_NSLEVEL_CONTROL,
+                        (void*) &stream_ns_level_map.at(type));
+            if (0 != status) {
+                PAL_ERR(LOG_TAG, "setParameters Failed");
+            }
+        }
+    }
+
+error:
+    PAL_INFO(LOG_TAG, "Exiting handleNSLevelControl, status %d", status);
     return status;
 }
 
@@ -13312,13 +13539,17 @@ void ResourceManager::process_device_info(struct xml_userdata *data, const XML_C
                         deviceInfo[size].bit_width);
                 deviceInfo[size].bit_width = BITWIDTH_16;
             }
-        }
-        else if (!strcmp(tag_name, "speaker_mono_right")) {
-            if (atoi(data->data_buf))
-                isMainSpeakerRight = true;
+        } else if (!strcmp(tag_name, "mono_speaker_position")) {
+            std::map<std::string, int>::iterator iter =
+                spkrPosTable.find(std::string(data->data_buf));
+            if (iter != spkrPosTable.end())
+                monoSpeakerPosition = iter->second;
+            PAL_DBG(LOG_TAG, "monoSpeakerPosition %d", monoSpeakerPosition);
         } else if (!strcmp(tag_name, "quick_cal_time")) {
             spQuickCalTime = atoi(data->data_buf);
-        }else if (!strcmp(tag_name, "ras_enabled")) {
+        } else if (!strcmp(tag_name, "spkr_cal_temp")) {
+            spCalTemp = atoi(data->data_buf);
+        } else if (!strcmp(tag_name, "ras_enabled")) {
             if (atoi(data->data_buf))
                 isRasEnabled = true;
         } else if (!strcmp(tag_name, "fractional_sr")) {

@@ -27,7 +27,7 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  * Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted (subject to the limitations in the
@@ -293,6 +293,8 @@ std::vector<allKVs> PayloadBuilder::all_streams;
 std::vector<allKVs> PayloadBuilder::all_streampps;
 std::vector<allKVs> PayloadBuilder::all_devices;
 std::vector<allKVs> PayloadBuilder::all_devicepps;
+
+uint32_t getSamplerateKv(uint32_t samplerate);
 
 template <typename T>
 void PayloadBuilder::populateChannelMixerCoeff(T pcmChannel, uint8_t numChannel,
@@ -1064,13 +1066,13 @@ std::string PayloadBuilder::removeSpaces(const std::string& str)
     return std::regex_replace(str, std::regex("^ +| +$|( ) +"), "$1");
 }
 
-std::vector<std::string> PayloadBuilder::splitStrings(const std::string& str)
+std::vector<std::string> PayloadBuilder::splitStrings(const std::string& str, char delimiter)
 {
     std::vector<std::string> tokens;
     std::stringstream check(str);
     std::string intermediate;
 
-    while (getline(check, intermediate, ',')) {
+    while (getline(check, intermediate, delimiter)) {
         if (!removeSpaces(intermediate).empty())
             tokens.push_back(removeSpaces(intermediate));
     }
@@ -1100,7 +1102,7 @@ void PayloadBuilder:: processKVSelectorData(struct user_xml_data *data,
         selector_type_t selector_type =  selectorstypeLUT.at(kvinfo.selector_names[i]);
 
         std::vector<std::string> selector_values =
-            splitStrings(sel_values_superset[i]);
+            splitStrings(sel_values_superset[i], ',');
 
         for (int j = 0; j < selector_values.size(); j++) {
             kvinfo.selector_pairs.push_back(std::make_pair(selector_type,
@@ -1156,7 +1158,7 @@ void PayloadBuilder:: processKVTypeData(struct user_xml_data *data,const XML_Cha
     PAL_DBG(LOG_TAG, "stream-device ID/type:%s, tag_name:%d", attr[1], data->tag);
     if (data->tag == TAG_STREAM_SEL || data->tag == TAG_STREAMPP_SEL) {
         if (!strcmp(attr[0], "type")) {
-            typeNames = splitStrings(attr[1]);
+            typeNames = splitStrings(attr[1], ',');
             for (int i = 0; i < typeNames.size(); i++) {
                 stream_id = ResourceManager::getStreamType(typeNames[i]);
                 sdTypeKV.id_type.push_back(stream_id);
@@ -1174,7 +1176,7 @@ void PayloadBuilder:: processKVTypeData(struct user_xml_data *data,const XML_Cha
     }
     if (data->tag == TAG_DEVICE_SEL || data->tag == TAG_DEVICEPP_SEL) {
         if (!strcmp(attr[0], "id")) {
-            typeNames = splitStrings(attr[1]);
+            typeNames = splitStrings(attr[1], ',');
             for (int i = 0; i < typeNames.size(); i++) {
                 dev_id = ResourceManager::getDeviceId(typeNames[i]);
                 sdTypeKV.id_type.push_back(dev_id);
@@ -2755,6 +2757,25 @@ int PayloadBuilder::retrieveKVs(std::vector<std::pair<selector_type_t, std::stri
             if (filled_selector_pairs[i].first == CUSTOM_CONFIG_SEL) {
                 PAL_INFO(LOG_TAG, "Fallback to find KVs without custom config %s",
                     filled_selector_pairs[i].second.c_str());
+
+                /* Copy combined custom configs to a variable */
+                std::string custom_config_all = filled_selector_pairs[i].second;
+
+                /* Separate the custom configs based on ';' */
+                std::vector<std::string> custom_keys = splitStrings(custom_config_all, ';');
+
+                /* Try to find KVs with each custom config */
+                for (const auto& key : custom_keys) {
+                    filled_selector_pairs[i].second = key;
+                    found = findKVs(filled_selector_pairs, type, any_type, keyVector);
+                    if (found) {
+                        PAL_DBG(LOG_TAG, "KVs found with token %s for the stream type/dev id: %d",
+                            key.c_str(), type);
+                        goto exit;
+                    }
+                }
+
+                /* If no KVs found, proceed with fallback mechanism */
                 filled_selector_pairs.erase(filled_selector_pairs.begin() + i);
                 custom_config_fallback = true;
             }
@@ -3355,6 +3376,59 @@ exit:
     PAL_DBG(LOG_TAG, "Exit, status %d", status);
     return status;
 }
+uint32_t getSamplerateKv(uint32_t samplerate)
+{
+    uint32_t value = 0;
+
+    switch (samplerate)
+    {
+        case 8000:
+            value = SAMPLINGRATE_8K;
+        break;
+        case 11025:
+            value = SAMPLINGRATE_11K;
+        break;
+        case 16000:
+            value = SAMPLINGRATE_16K;
+        break;
+        case 22050:
+            value = SAMPLINGRATE_22K;
+        break;
+        case 32000:
+            value = SAMPLINGRATE_32K;
+        break;
+        case 44100:
+            value = SAMPLINGRATE_44K;
+        break;
+        case 48000:
+            value = SAMPLINGRATE_48K;
+        break;
+        case 64000:
+            value = SAMPLINGRATE_64K;
+        break;
+        case 88200:
+            value = SAMPLINGRATE_88K;
+        break;
+        case 96000:
+            value = SAMPLINGRATE_96K;
+        break;
+        case 176400:
+            value = SAMPLINGRATE_176K;
+        break;
+        case 192000:
+            value = SAMPLINGRATE_192K;
+        break;
+        case 352800:
+            value = SAMPLINGRATE_352K;
+        break;
+        case 384000:
+            value = SAMPLINGRATE_384K;
+        break;
+        default:
+            break;
+    }
+    return value;
+}
 
 int PayloadBuilder::populateDevicePPCkv(Stream *s, std::vector <std::pair<int,int>> &keyVector)
 {
@@ -3364,6 +3438,7 @@ int PayloadBuilder::populateDevicePPCkv(Stream *s, std::vector <std::pair<int,in
     struct pal_device dAttr;
     std::shared_ptr<ResourceManager> rm = ResourceManager::getInstance();
     struct pal_device_info devInfo = {};
+    uint32_t sampleRateKv = 0;
 
     PAL_DBG(LOG_TAG,"Enter");
     sattr = new struct pal_stream_attributes;
@@ -3410,12 +3485,40 @@ int PayloadBuilder::populateDevicePPCkv(Stream *s, std::vector <std::pair<int,in
                                                    dAttr.config.ch_info.channels));
                 break;
             case PAL_STREAM_VOIP_RX:
-            case PAL_STREAM_VOIP_TX:
                 if ((devInfo.isUSBUUIdBasedTuningEnabledFlag) &&
                     (USB::isUsbConnected(dAttr.address))) {
                     keyVector.push_back(std::make_pair(USB_VENDOR_ID, USB::getVendorIdCkv()));
                 }
+                if ((dAttr.id != PAL_DEVICE_OUT_SPEAKER) &&
+                    (dAttr.id != PAL_DEVICE_OUT_HANDSET) &&
+                    (dAttr.id != PAL_DEVICE_OUT_WIRED_HEADSET) &&
+                    (dAttr.id != PAL_DEVICE_OUT_WIRED_HEADPHONE)&&
+                    (dAttr.id != PAL_DEVICE_OUT_USB_HEADSET) &&
+                    (dAttr.id != PAL_DEVICE_OUT_USB_DEVICE))
+                    break;
+
+                PAL_DBG(LOG_TAG,"VoiP_RX Sample Rate[%d]\n", dAttr.config.sample_rate);
+                 if ((sampleRateKv = getSamplerateKv(dAttr.config.sample_rate)) != 0)
+                    keyVector.push_back(std::make_pair(SAMPLINGRATE, sampleRateKv));
                 break;
+
+            case PAL_STREAM_VOIP_TX:
+            case PAL_STREAM_VOICE_RECOGNITION:
+               if ((devInfo.isUSBUUIdBasedTuningEnabledFlag) &&
+                    (USB::isUsbConnected(dAttr.address))) {
+                    keyVector.push_back(std::make_pair(USB_VENDOR_ID, USB::getVendorIdCkv()));
+            }
+                if ((dAttr.id != PAL_DEVICE_IN_SPEAKER_MIC) &&
+                    (dAttr.id != PAL_DEVICE_IN_HANDSET_MIC) &&
+                    (dAttr.id != PAL_DEVICE_IN_WIRED_HEADSET)&&
+                    (dAttr.id != PAL_DEVICE_IN_USB_HEADSET))
+                    break;
+
+                PAL_DBG(LOG_TAG,"stream type %d Sample Rate[%d]\n", sattr->type, dAttr.config.sample_rate);
+                if ((sampleRateKv = getSamplerateKv(dAttr.config.sample_rate)) != 0)
+                    keyVector.push_back(std::make_pair(SAMPLINGRATE, sampleRateKv));
+                break;
+
             case PAL_STREAM_LOW_LATENCY:
             case PAL_STREAM_DEEP_BUFFER:
             case PAL_STREAM_SPATIAL_AUDIO:
@@ -3450,6 +3553,20 @@ int PayloadBuilder::populateDevicePPCkv(Stream *s, std::vector <std::pair<int,in
                     (USB::isUsbConnected(dAttr.address))) {
                     keyVector.push_back(std::make_pair(USB_VENDOR_ID, USB::getVendorIdCkv()));
                 }
+                if ((dAttr.id == PAL_DEVICE_OUT_SPEAKER) ||
+                    (dAttr.id == PAL_DEVICE_OUT_HANDSET) ||
+                    (dAttr.id == PAL_DEVICE_OUT_WIRED_HEADSET) ||
+                    (dAttr.id == PAL_DEVICE_OUT_WIRED_HEADPHONE) ||
+                    (dAttr.id == PAL_DEVICE_OUT_USB_HEADSET) ||
+                    (dAttr.id == PAL_DEVICE_OUT_USB_DEVICE) ||
+                    (dAttr.id == PAL_DEVICE_IN_SPEAKER_MIC) ||
+                    (dAttr.id == PAL_DEVICE_IN_HANDSET_MIC) ||
+                    (dAttr.id == PAL_DEVICE_IN_WIRED_HEADSET)||
+                    (dAttr.id == PAL_DEVICE_IN_USB_HEADSET)) {
+                    if ((sampleRateKv = getSamplerateKv(dAttr.config.sample_rate)) != 0)
+                        keyVector.push_back(std::make_pair(SAMPLINGRATE, sampleRateKv));
+                    PAL_DBG(LOG_TAG,"stream type %d Sample Rate[%d]\n", sattr->type, dAttr.config.sample_rate);
+                }
                 /* TBD: Push Channels for these types once Channels are added */
                 //keyVector.push_back(std::make_pair(CHANNELS,
                 //                                   dAttr.config.ch_info.channels));
@@ -3467,7 +3584,7 @@ exit:
 }
 
 int PayloadBuilder::populateCalKeyVector(Stream *s, std::vector <std::pair<int,int>> &ckv, int tag) {
-    int status = 0;
+    int status = 0, spkViMap, spkDevMap;
     PAL_VERBOSE(LOG_TAG,"enter \n");
     std::vector <std::pair<int,int>> keyVector;
     struct pal_stream_attributes sAttr;
@@ -3602,7 +3719,9 @@ int PayloadBuilder::populateCalKeyVector(Stream *s, std::vector <std::pair<int,i
                 }
                 else {
                     PAL_DBG(LOG_TAG, "Mono channel speaker");
-                    ckv.push_back(std::make_pair(SPK_PRO_DEV_MAP, RIGHT_MONO));
+                    spkDevMap = ResourceManager::monoSpeakerPosition == SPKR_LEFT
+                                                        ? LEFT_MONO : RIGHT_MONO;
+                    ckv.push_back(std::make_pair(SPK_PRO_DEV_MAP, spkDevMap));
                 }
                 break;
             }
@@ -3654,7 +3773,9 @@ int PayloadBuilder::populateCalKeyVector(Stream *s, std::vector <std::pair<int,i
                 }
                 else {
                     PAL_DBG(LOG_TAG, "Mono channel speaker");
-                    ckv.push_back(std::make_pair(SPK_PRO_VI_MAP, RIGHT_SPKR));
+                    spkViMap = ResourceManager::monoSpeakerPosition == SPKR_LEFT
+                                                        ? LEFT_SPKR : RIGHT_SPKR;
+                    ckv.push_back(std::make_pair(SPK_PRO_VI_MAP, spkViMap));
                 }
                 break;
             }
@@ -3976,6 +4097,33 @@ free_vol:
     if (voldata)
         free(voldata);
     return status;
+}
+
+void PayloadBuilder::payloadNSLevelConfig(uint8_t** payload, size_t* size,uint32_t miid,int16_t ns_remix) {
+    struct apm_module_param_data_t* header = NULL;
+    struct fluence_nn_ui_ns_v1_param_t *nslevelPack = NULL;
+    uint8_t* payloadInfo = NULL;
+    size_t payloadSize = 0, padBytes = 0;
+    payloadSize =
+        sizeof(struct apm_module_param_data_t) + sizeof(struct fluence_nn_ui_ns_v1_param_t);
+    padBytes = PAL_PADDING_8BYTE_ALIGN(payloadSize);
+    payloadInfo = (uint8_t *)calloc(1, (size_t)payloadSize);
+    if (!payloadInfo) {
+        PAL_ERR(LOG_TAG, "payloadInfo alloc failed %s", strerror(errno));
+        return;
+    }
+    header = (struct apm_module_param_data_t*)payloadInfo;
+    nslevelPack =
+        (struct fluence_nn_ui_ns_v1_param_t*)(payloadInfo + sizeof(struct apm_module_param_data_t));
+
+    header->module_instance_id = miid;
+    header->param_id = PARAM_ID_FLUENCE_NN_UI_NS_V1;
+    header->error_code = 0x0;
+    header->param_size = payloadSize - sizeof(struct apm_module_param_data_t);
+    nslevelPack->ns_remix = ns_remix;
+    *size = payloadSize + padBytes;
+    *payload = payloadInfo;
+    PAL_INFO(LOG_TAG, "customPayload address %pK and size %zu", payloadInfo, *size);
 }
 
 void PayloadBuilder::payloadSPConfig(uint8_t** payload, size_t* size, uint32_t miid,

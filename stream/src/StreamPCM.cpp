@@ -26,9 +26,9 @@
  * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
+ * Changes from Qualcomm Technologies, Inc. are provided under the following license:
  *
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -42,6 +42,33 @@
 #include "Device.h"
 #include <unistd.h>
 #include <chrono>
+
+std::condition_variable pauseCV;
+
+static void handleSessionCallBack(uint64_t hdl, uint32_t event_id, void *data,
+                                  uint32_t event_size)
+{
+    Stream *s = (Stream *) hdl;
+    std::shared_ptr<ResourceManager> rm = nullptr;
+    pal_device_id_t dev_id;
+
+    PAL_DBG(LOG_TAG,"Event id %x ", event_id);
+
+    rm = ResourceManager::getInstance();
+    if (!rm) {
+        PAL_ERR(LOG_TAG, "ResourceManager getInstance failed");
+        return;
+    }
+
+    if (event_id == EVENT_ID_SOFT_PAUSE_PAUSE_COMPLETE) {
+        PAL_DBG(LOG_TAG, "Pause done");
+        pauseCV.notify_all();
+    } else if (event_id == EVENT_ID_MIC_OCCLUSION_STATUS_INFO) {
+        PAL_DBG(LOG_TAG," Mic Occlusion info received");
+        // Notify Resource Manager to update the cache.
+        rm->updateMicOcclusionInfo(s, data);
+    }
+}
 
 StreamPCM::StreamPCM(const struct pal_stream_attributes *sattr, struct pal_device *dattr,
                     const uint32_t no_of_devices, const struct modifier_kv *modifiers,
@@ -177,10 +204,8 @@ StreamPCM::StreamPCM(const struct pal_stream_attributes *sattr, struct pal_devic
         dev = nullptr;
     }
 
-
-    // Register for Soft pause events
-    if (mStreamAttr->direction == PAL_AUDIO_OUTPUT )
-        session->registerCallBack(handleSoftPauseCallBack, (uint64_t)this);
+    // Register for session events
+    session->registerCallBack(handleSessionCallBack, (uint64_t)this);
 
     mStreamMutex.unlock();
     PAL_DBG(LOG_TAG, "Exit. state %d", currentState);
@@ -1255,6 +1280,15 @@ int32_t  StreamPCM::setParameters(uint32_t param_id, void *payload)
                        status);
             break;
         }
+        case PAL_PARAM_ID_NSLEVEL_CONTROL:
+        {
+            int16_t* ns_level = (int16_t*)payload;
+            status = session->setParameters(this, NS_LEVEL_CONTROL,
+                                                PAL_PARAM_ID_NSLEVEL_CONTROL, ns_level);
+            if (status)
+                PAL_ERR(LOG_TAG,"setParameters for NSLevel failed with %d", status);
+            break;
+        }
         default:
             PAL_ERR(LOG_TAG, "Unsupported param id %u", param_id);
             status = -EINVAL;
@@ -1765,3 +1799,20 @@ int32_t StreamPCM::GetMmapPosition(struct pal_mmap_position *position)
 
     return status;
 }
+
+int32_t StreamPCM::ResetMmapBuff()
+{
+    int32_t status = 0;
+    PAL_DBG(LOG_TAG, "Enter");
+
+    mStreamMutex.lock();
+    status = session->ResetMmapBuffer(this);
+    mStreamMutex.unlock();
+
+    if (0 != status)
+        PAL_ERR(LOG_TAG, "ResetMmapBuff failed with status = %d", status);
+
+    PAL_DBG(LOG_TAG, "Exit. status - %d", status);
+    return status;
+}
+

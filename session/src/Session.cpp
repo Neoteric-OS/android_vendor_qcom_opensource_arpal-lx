@@ -26,9 +26,8 @@
  * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
- *
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Changes from Qualcomm Technologies, Inc. are provided under the following license:
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted (subject to the limitations in the
@@ -740,6 +739,25 @@ int Session::handleDeviceRotation(Stream *s, pal_speaker_rotation_type rotation_
     return status;
 }
 
+int Session::handleNSLevelParam(Stream *s, int16_t ns_level, int device, struct mixer *mixer, PayloadBuilder* builder, std::vector<std::pair<int32_t, std::string>> txAifBackEnds) {
+    uint32_t miid;
+    int status;
+    uint8_t* paramData = NULL;
+    size_t paramSize = 0;
+    status = SessionAlsaUtils::getModuleInstanceId(mixer, device, txAifBackEnds[0].second.data(),
+                                             TAG_NS_LEVEL_CONTROL, &miid);
+    if (!status) {
+        builder->payloadNSLevelConfig(&paramData, &paramSize, miid, ns_level);
+        if (paramSize) {
+            status = SessionAlsaUtils::setMixerParameter(mixer, device, paramData, paramSize);
+            if (status)
+                PAL_ERR(LOG_TAG, "setMixerParam failed for NSLevel Control");
+            freeCustomPayload(&paramData, &paramSize);
+        }
+    }
+    return status;
+}
+
 int Session::HDRConfigKeyToDevOrientation(const char* hdr_custom_key)
 {
     if (!strcmp(hdr_custom_key, "unprocessed-hdr-mic-portrait"))
@@ -855,6 +873,7 @@ int Session::configureMFC(const std::shared_ptr<ResourceManager>& rm, struct pal
     PayloadBuilder* builder = new PayloadBuilder();
     uint32_t miid = 0;
     bool devicePPMFCSet =  true;
+    std::vector<uint32_t> MIIDs;
 
     // clear any cached custom payload
     freeCustomPayload();
@@ -939,10 +958,8 @@ int Session::configureMFC(const std::shared_ptr<ResourceManager>& rm, struct pal
     /* Get PSPD MFC MIID and configure to match to device config */
     /* This has to be done after sending all mixer controls and before connect */
     status = SessionAlsaUtils::getModuleInstanceId(mixer, pcmDevIds.at(0), intf,
-                                                   TAG_DEVICE_MFC_SR, &miid);
+                                                   TAG_DEVICE_MFC_SR, MIIDs);
     if (status == 0) {
-        PAL_DBG(LOG_TAG, "miid : %x id = %d, data %s, dev id = %d\n", miid,
-                pcmDevIds.at(0), intf, dAttr.id);
 
         if (dAttr.id == PAL_DEVICE_OUT_BLUETOOTH_A2DP ||
             dAttr.id == PAL_DEVICE_OUT_BLUETOOTH_SCO ||
@@ -981,18 +998,20 @@ int Session::configureMFC(const std::shared_ptr<ResourceManager>& rm, struct pal
             dAttr.id == PAL_DEVICE_OUT_HDMI)
             mfcData.ch_info = &dAttr.config.ch_info;
 
-        builder->payloadMFCConfig((uint8_t **)&payload, &payloadSize, miid, &mfcData);
-        if (!payloadSize) {
-            PAL_ERR(LOG_TAG, "payloadMFCConfig failed\n");
-            status = -EINVAL;
-            goto exit;
-        }
+        for (const auto& miid : MIIDs) {
+            builder->payloadMFCConfig((uint8_t **)&payload, &payloadSize, miid, &mfcData);
+            if (!payloadSize) {
+                PAL_ERR(LOG_TAG, "payloadMFCConfig failed\n");
+                status = -EINVAL;
+                goto exit;
+            }
 
-        status = updateCustomPayload(payload, payloadSize);
-        freeCustomPayload(&payload, &payloadSize);
-        if (0 != status) {
-            PAL_ERR(LOG_TAG, "updateCustomPayload Failed\n");
-            goto exit;
+            status = updateCustomPayload(payload, payloadSize);
+            freeCustomPayload(&payload, &payloadSize);
+            if (0 != status) {
+                PAL_ERR(LOG_TAG, "updateCustomPayload Failed\n");
+                goto exit;
+            }
         }
     } else {
         PAL_ERR(LOG_TAG, "getModuleInstanceId failed");

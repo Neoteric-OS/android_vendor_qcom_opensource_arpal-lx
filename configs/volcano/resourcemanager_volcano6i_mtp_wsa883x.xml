@@ -69,6 +69,7 @@
         <param key="hifi_filter" value="false"/>
         <param key="max_sessions" value="128"/>
         <param key="max_nonTunnel_sessions" value="4"/>
+        <param key="xpan_enabled" value ="true" />
         <param key="logging_level" value ="3" />
         <param key="context_manager_enable" value ="true" />
         <param key="upd_dedicated_be" value ="false" />
@@ -190,6 +191,10 @@
                 <custom-config key="unprocessed-hdr-mic-inverted-portrait">
                     <channels>4</channels>
                     <snd_device_name>unprocessed-hdr-mic-inverted-portrait</snd_device_name>
+                </custom-config>
+                <custom-config key="dual-mic-true-stereo">
+                    <channels>2</channels>
+                    <snd_device_name>handset-dmic-endfire</snd_device_name>
                 </custom-config>
             </usecase>
         <!--Uncomment these lines instead of above lines if needing to enable EC per custom key
@@ -313,6 +318,10 @@
                 <custom-config key="unprocessed-hdr-mic-inverted-portrait">
                     <channels>4</channels>
                     <snd_device_name>unprocessed-hdr-mic-inverted-portrait</snd_device_name>
+                </custom-config>
+                <custom-config key="dual-mic-true-stereo">
+                    <channels>2</channels>
+                    <snd_device_name>speaker-dmic-endfire</snd_device_name>
                 </custom-config>
             </usecase>
         <!--Uncomment these lines instead of above lines if needing to enable EC per custom key
@@ -447,7 +456,7 @@
         </in-device>
         <in-device>
             <id>PAL_DEVICE_IN_BLUETOOTH_SCO_HEADSET</id>
-            <back_end_name>SLIM-DEV1-TX-7</back_end_name>
+            <back_end_name>BTFM_PROXY-TX-0</back_end_name>
             <max_channels>1</max_channels>
             <channels>1</channels>
             <samplerate>8000</samplerate>
@@ -617,7 +626,7 @@
         </in-device>
         <in-device>
             <id>PAL_DEVICE_IN_BLUETOOTH_A2DP</id>
-            <back_end_name>SLIM-DEV1-TX-7</back_end_name>
+            <back_end_name>BTFM_PROXY-TX-0</back_end_name>
             <max_channels>1</max_channels>
             <channels>1</channels>
             <snd_device_name>bt-a2dp-mic</snd_device_name>
@@ -626,7 +635,7 @@
         </in-device>
         <in-device>
             <id>PAL_DEVICE_IN_BLUETOOTH_BLE</id>
-            <back_end_name>SLIM-DEV1-TX-7</back_end_name>
+            <back_end_name>BTFM_PROXY-TX-0</back_end_name>
             <max_channels>1</max_channels>
             <channels>1</channels>
             <snd_device_name>bt-ble-mic</snd_device_name>
@@ -752,17 +761,13 @@
             <supported_bit_format>PAL_AUDIO_FMT_PCM_S24_LE</supported_bit_format>
             <!-- RAS should be enabled with speaker protection always -->
             <ras_enabled>0</ras_enabled>
-            <!-- Flag to specify speaker in case Voice call is switched from
-                 handset to speaker with only 1 speaker.
-                 Values: Both speaker : 0
-                         Right speaker: 1
-                         Left speaker : 2
+            <!-- Flag to specify speaker in mono speaker usecase
+                         Right speaker: SPKR_RIGHT
+                         Left speaker : SPKR_LEFT
             -->
-            <speaker_mono_right>0</speaker_mono_right>
+            <mono_speaker_position>SPKR_RIGHT</mono_speaker_position>
             <!-- Time in seconds for Quick cal. Set 0 to disable -->
             <quick_cal_time>0</quick_cal_time>
-            <!-- Static T0 value for speaker protection calibration -->
-            <!-- <spkr_cal_temp>25</spkr_cal_temp> -->
             <usecase>
                 <name>PAL_STREAM_VOICE_CALL</name>
                 <priority>1</priority>
@@ -913,7 +918,7 @@
          </out-device>
         <out-device>
             <id>PAL_DEVICE_OUT_BLUETOOTH_A2DP</id>
-            <back_end_name>SLIM-DEV1-RX-7</back_end_name>
+            <back_end_name>BTFM_PROXY-RX-0</back_end_name>
             <max_channels>1</max_channels>
             <channels>1</channels>
             <snd_device_name>bt-a2dp</snd_device_name>
@@ -926,7 +931,7 @@
         </out-device>
         <out-device>
             <id>PAL_DEVICE_OUT_BLUETOOTH_BLE</id>
-            <back_end_name>SLIM-DEV1-RX-7</back_end_name>
+            <back_end_name>BTFM_PROXY-RX-0</back_end_name>
             <max_channels>1</max_channels>
             <channels>1</channels>
             <snd_device_name>bt-ble</snd_device_name>
@@ -939,7 +944,7 @@
         </out-device>
         <out-device>
             <id>PAL_DEVICE_OUT_BLUETOOTH_BLE_BROADCAST</id>
-            <back_end_name>SLIM-DEV1-RX-7</back_end_name>
+            <back_end_name>BTFM_PROXY-RX-0</back_end_name>
             <max_channels>1</max_channels>
             <channels>1</channels>
             <snd_device_name>bt-ble</snd_device_name>
@@ -948,7 +953,7 @@
         </out-device>
         <out-device>
             <id>PAL_DEVICE_OUT_BLUETOOTH_SCO</id>
-            <back_end_name>SLIM-DEV1-RX-7</back_end_name>
+            <back_end_name>BTFM_PROXY-RX-0</back_end_name>
             <max_channels>1</max_channels>
             <channels>1</channels>
             <snd_device_name>bt-sco</snd_device_name>

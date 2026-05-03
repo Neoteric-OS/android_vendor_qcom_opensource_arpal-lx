@@ -268,6 +268,7 @@ public:
         uint32_t encoderMIID, uint32_t newBitrate, size_t &outputPayloadSize);
     void payloadPlaybackRateParametersConfig(uint8_t** payload, size_t* size,
                           uint32_t miid, pal_param_playback_rate *playbackRate);
+    void payloadNSLevelConfig(uint8_t** payload, size_t* size,uint32_t miid,int16_t ns_remix);
 
     int populateStreamKV(Stream* s, std::vector <std::pair<int,int>> &keyVector);
     int populateStreamKV(Stream* s, std::vector <std::pair<int,int>> &keyVectorRx,
@@ -318,7 +319,7 @@ public:
         &filled_selector_pairs, uint32_t type, std::vector<allKVs> &any_type,
         std::vector<std::pair<int32_t, int32_t>> &keyVector);
     static std::string removeSpaces(const std::string& str);
-    static std::vector<std::string> splitStrings(const std::string& str);
+    static std::vector<std::string> splitStrings(const std::string& str, char delimiter);
     static int getBtDeviceKV(int dev_id, std::vector<std::pair<int, int>> &deviceKV,
         uint32_t codecFormat, bool isAbrEnabled, bool isHostless);
     static int getDeviceKV(int dev_id, std::vector<std::pair<int, int>> &deviceKV);

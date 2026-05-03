@@ -29,7 +29,7 @@
 
 /*
 Changes from Qualcomm Innovation Center are provided under the following license:
-Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
 SPDX-License-Identifier: BSD-3-Clause-Clear
 
 Redistribution and use in source and binary forms, with or without
@@ -99,6 +99,8 @@ private:
     bool hd_voice = false;
     pal_device_mute_t dev_mute = {};
     int sideTone_cnt = 0;
+    session_callback sessionCb;
+    uint64_t cbCookie;
 
 public:
 
@@ -123,8 +125,11 @@ public:
                              pal_stream_type_t streamType,
                              std::shared_ptr<Device> deviceToConnect);
     int setECRef(Stream *s, std::shared_ptr<Device> rx_dev, bool is_enable) {return 0;};
+    int registerCallBack(session_callback cb, uint64_t cookie) override;
 private:
     int payloadCalKeys(Stream * s, uint8_t **payload, size_t *size);
+    int payloadCKVs(uint8_t **payload, size_t *size, uint32_t channels);
+    int setVoiceCKVS(Stream * s);
     int payloadTaged(Stream * s, configType type, int tag, int device, int dir);
     int payloadSetVSID(Stream* s);
     int payloadSetChannelInfo(Stream * s, uint8_t **payload, size_t *size);

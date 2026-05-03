@@ -28,7 +28,7 @@
  *
  * Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
  *
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -67,6 +67,17 @@ typedef enum {
     RX_HOSTLESS = 1,
     TX_HOSTLESS,
 } hostless_dir_t;
+
+typedef enum {
+    MIC_OCC_STATE_NO_OCCLUSION = 0,
+    MIC_OCC_STATE_MIC1_BLOCKED,
+    MIC_OCC_STATE_MIC0_BLOCKED,
+} mic_occlusion_states_t;
+
+typedef enum {
+    PRIMARY_MIC = 0,
+    SECONDARY_MIC,
+};
 
 #define audio_mixer mixer
 #define MAX_SND_CARD 10
@@ -488,6 +499,7 @@ private:
     int handleScreenStatusChange(pal_param_screen_state_t screen_state);
     int handleDeviceRotationChange(pal_param_device_rotation_t rotation_type);
     int handleDeviceConnectionChange(pal_param_device_connection_t connection_state);
+    int handleNSLevelControl(pal_param_ns_level_control_t param_ns_level_control);
     int SetOrientationCal(pal_param_device_rotation_t rotation_type);
     int32_t streamDevDisconnect(std::vector <std::tuple<Stream *, uint32_t>> streamDevDisconnectList);
     int32_t streamDevConnect(std::vector <std::tuple<Stream *, struct pal_device *>> streamDevConnectList);
@@ -590,6 +602,7 @@ protected:
     static std::map<std::string, uint32_t> btFmtTable;
     static std::map<std::string, int> spkrPosTable;
     static std::map<int, std::string> spkrTempCtrlsMap;
+    std::unordered_map<Stream *, std::vector<pal_param_mic_occlusion_info_t>> micOcclusionInfoMap;
     static std::map<uint32_t, uint32_t> btSlimClockSrcMap;
     static std::vector<deviceIn> deviceInfo;
     static std::vector<tx_ecinfo> txEcInfo;
@@ -636,8 +649,10 @@ protected:
     std::shared_ptr<SignalHandler> mSigHandler;
     static std::vector<int> spViChannelMapCfg;
     std::map<int, bool> PCMDataInstances;
+    int getPcmIdByDevInfoName(char *mixer_str);
 public:
     ~ResourceManager();
+    static std::map<pal_stream_type_t,int16_t> stream_ns_level_map;
     static bool mixerClosed;
     enum card_status_t cardState;
     bool ssrStarted = false;
@@ -665,9 +680,11 @@ public:
     /* Variable to store which speaker side is being used for call audio.
      * Valid for Stereo case only
      */
-    static bool isMainSpeakerRight;
+    static int monoSpeakerPosition;
     /* Variable to store Quick calibration time for Speaker protection */
     static int spQuickCalTime;
+    /* Variable to store calibration temprature for Speaker protection from RM.xml file */
+    static int spCalTemp;
     /* Variable to store the mode request for Speaker protection */
     pal_spkr_prot_payload mSpkrProtModeValue;
 
@@ -746,6 +763,11 @@ public:
     static int AudioFeatureStatsGetInfo(void **afs_payload, size_t *afs_payload_size);
     void checkQVAAppPresence(afs_param_payload_t *payload);
     pal_param_payload *AFSWakeUpAlgoDetection();
+
+    /** Update mic occlusion info when event is detected */
+    int32_t updateMicOcclusionInfo(Stream* stream_hdl, void* data);
+    void addMicOcclusionInfo(Stream *s);
+    void removeMicOcclusionInfo(Stream *s);
 
     /* checks config for both stream and device */
     bool isStreamSupported(struct pal_stream_attributes *attributes,

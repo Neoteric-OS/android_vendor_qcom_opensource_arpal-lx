@@ -28,7 +28,7 @@
  *
  * Changes from Qualcomm Innovation Center are provided under the following license:
  *
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted (subject to the limitations in the
@@ -157,6 +157,7 @@ public:
     int getTagsWithModuleInfo(Stream *s, size_t *size __unused, uint8_t *payload);
     void retryOpenWithoutEC(Stream *s, unsigned int pcm_flags, struct pcm_config *config);
     int reconfigureModule(uint32_t tagID, const char* BE, struct sessionToPayloadParam *data);
+    int populateECMFCPayload(Stream *s, size_t *payloadSize, uint8_t **payload);
 };
 
 #endif //SESSION_ALSAPCM_H
