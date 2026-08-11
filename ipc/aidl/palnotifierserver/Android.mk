@@ -32,6 +32,7 @@ LOCAL_SHARED_LIBRARIES := \
     vendor.qti.hardware.paleventnotifier-V2-ndk
 
 LOCAL_HEADER_LIBRARIES := \
-    libspf-headers
+    libspf-headers \
+    libarpal_headers
 
 include $(BUILD_SHARED_LIBRARY)

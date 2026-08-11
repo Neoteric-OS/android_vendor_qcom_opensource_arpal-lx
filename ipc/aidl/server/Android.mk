@@ -32,6 +32,7 @@ LOCAL_SHARED_LIBRARIES := \
 
 LOCAL_HEADER_LIBRARIES := \
     libspf-headers \
+    libarpal_headers \
     libarosal_headers \
     libacdb_headers
 
